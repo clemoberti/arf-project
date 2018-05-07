@@ -21,3 +21,10 @@ def show_sample_usps(data):
 
 def show_usps(data):
     plt.imshow(data.reshape((16,16)),interpolation="nearest",cmap="gray")
+
+def filter_values(x, y, a,b):
+    indexes = np.where(np.logical_or(y == a, y == b))[0]
+    Y = np.array(y[indexes])
+    Y[Y == a] = -1
+    Y[Y == b] = 1
+    return np.array(x[indexes]),Y
