@@ -67,4 +67,8 @@ class ImageProcessing:
     
     def get_incomplete_patches(self, img, h):
         contains_zero  = lambda patch: (patch[:,:] == 0).any() 
-        return [patch for patch in self.get_all_patches(h, img) if contains_zero(patch)]
+        return np.array([patch for patch in self.get_all_patches(h, img) if contains_zero(patch)])
+    
+    def get_dictionnary_patches(self, img, h):
+        not_contain_zero = lambda patch: (patch[:,:] != 0).all() 
+        return np.array([patch for patch in self.get_all_patches(h, img) if not_contain_zero(patch)])
