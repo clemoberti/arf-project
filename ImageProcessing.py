@@ -18,7 +18,7 @@ class ImageProcessing:
         plt.imshow(fn)
         plt.show()
 
-    def get_all_patches(self,h, im):
+    def get_all_patches_by_pixel(self,h, im):
         window_shape = (h, h)
         return extract_patches_2d(im, window_shape)
         #return B[0][0]
@@ -27,8 +27,11 @@ class ImageProcessing:
     def get_patch(self, i,j,h,image):
         window_start_i = i - h // 2 # left upper corner of the window
         window_start_j = j - h // 2
-        window_end_i = i + h // 2 + 1 # right lower corner of the window
-        window_end_j = j + h // 2 + 1
+        window_end_i = i + h // 2# right lower corner of the window
+        window_end_j = j + h // 2
+        
+        if len(image.shape) == 2: # only for testing with number matrix
+            return image[window_start_i:window_end_i, window_start_j:window_end_j]
         
         return image[window_start_i:window_end_i, window_start_j:window_end_j,:]
     
@@ -65,10 +68,36 @@ class ImageProcessing:
         new_image[i:i+height, j:j+width,:] = 0
         return new_image
     
-    def get_incomplete_patches(self, img, h):
-        contains_zero  = lambda patch: (patch[:,:] == 0).any() 
-        return np.array([patch for patch in self.get_all_patches(h, img) if contains_zero(patch)])
+    def create_grid(self, min_x,max_x,min_y,max_y, step):
+        """
+        grid explainded : https://stackoverflow.com/questions/36013063/what-is-purpose-of-meshgrid-in-python
+        """
+        xvalues = np.arange(min_x, max_x, step);
+        yvalues = np.arange(min_y, max_y, step);
+
+        xx, yy = np.meshgrid(xvalues, yvalues)
+        return np.array([xx.flatten(), yy.flatten()]).T
     
-    def get_dictionnary_patches(self, img, h):
+    def get_incomplete_patches_by_pixel(self, img, h):
+        contains_zero  = lambda patch: (patch[:,:] == 0).any() 
+        return np.array([patch for patch in self.get_all_patches_by_pixel(h, img) if contains_zero(patch)])
+    
+    def get_dictionnary_patches_by_pixel(self, img, h):
         not_contain_zero = lambda patch: (patch[:,:] != 0).all() 
-        return np.array([patch for patch in self.get_all_patches(h, img) if not_contain_zero(patch)])
+        return np.array([patch for patch in self.get_all_patches_by_pixel(h, img) if not_contain_zero(patch)])
+    
+    def get_all_patches(self, im, h, step):
+        margin = h // 2
+        N = im.shape[0]
+        max_x = N - margin + 1 if N % 2 == 0 else N - margin
+        max_y = N - margin + 1 if N % 2 == 0 else N - margin
+        grid = self.create_grid(margin,max_x, margin,max_y, step)
+        return np.array([self.get_patch(pair[0], pair[1], h, im) for pair in grid])
+    
+    def get_incomplete_patches(self, img, h, step):
+        contains_zero  = lambda patch: (patch[:,:] == 0).any() 
+        return np.array([patch for patch in self.get_all_patches(img,h, step) if contains_zero(patch)])
+    
+    def get_dictionnary_patches(self, img, h, step):
+        not_contain_zero = lambda patch: (patch[:,:] != 0).all() 
+        return np.array([patch for patch in self.get_all_patches(img,h, step) if not_contain_zero(patch)])
