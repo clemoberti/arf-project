@@ -99,5 +99,22 @@ class ImageProcessing:
         return np.array([patch for patch in self.get_all_patches(img,h, step) if contains_zero(patch)])
     
     def get_dictionnary_patches(self, img, h, step):
-        not_contain_zero = lambda patch: (patch[:,:] != 0).all() 
-        return np.array([patch for patch in self.get_all_patches(img,h, step) if not_contain_zero(patch)])
+        """
+        Get all patche and convert to vectors.
+        """
+        #not_contain_zero = lambda patch: (patch[:,:] != 0).all() filtrage plus tard
+        return np.array([self.patch_to_vector(patch) \
+                         for patch in self.get_all_patches(img,h, step)]).T #if not_contain_zero(patch)]).T
+    
+    def reconstruct_image(self,dictionary, h, step, N):
+        patches_n = dictionary.shape[1]
+        N = int(np.sqrt(patches_n))
+        horizontals = []
+        for i in range(N):
+            start = i * N
+            end = start + N
+            #dictionary[:, start:end]
+            horizontal = np.hstack([self.vector_to_patch(dictionary[:,i]) for i in range(start, end)])
+            horizontals.append(horizontal)
+        
+        return np.vstack(horizontals)
