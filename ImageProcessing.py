@@ -92,13 +92,13 @@ class ImageProcessing:
         max_x = N - margin + 1 if N % 2 == 0 else N - margin
         max_y = N - margin + 1 if N % 2 == 0 else N - margin
         grid = self.create_grid(margin,max_x, margin,max_y, step)
-        return np.array([self.get_patch(pair[0], pair[1], h, im) for pair in grid])
+        return np.array([self.get_patch(pair[1], pair[0], h, im) for pair in grid])
     
     def get_incomplete_patches(self, img, h, step):
         contains_zero  = lambda patch: (patch[:,:] == 0).any() 
         return np.array([patch for patch in self.get_all_patches(img,h, step) if contains_zero(patch)])
     
-    def get_dictionnary_patches(self, img, h, step):
+    def get_dictionary_patches(self, img, h, step):
         """
         Get all patche and convert to vectors.
         """
@@ -106,7 +106,7 @@ class ImageProcessing:
         return np.array([self.patch_to_vector(patch) \
                          for patch in self.get_all_patches(img,h, step)]).T #if not_contain_zero(patch)]).T
     
-    def reconstruct_image(self,dictionary, h, step, N):
+    def reconstruct_image(self,dictionary, h, step):
         patches_n = dictionary.shape[1]
         N = int(np.sqrt(patches_n))
         horizontals = []
