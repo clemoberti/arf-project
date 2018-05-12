@@ -13,6 +13,9 @@ class ImageProcessing:
         h = min(image.shape[0:2]) # make sure image is squared
         return rgb_to_hsv(image[:h,:h,:])
 
+    def read_im2(self,fn):
+        return np.array(plt.imread(fn))
+    
     # Affichage de l’image (et des pixels manquants)
     def show_im(self,fn):
         plt.imshow(fn)
@@ -41,10 +44,10 @@ class ImageProcessing:
         return patch.reshape(x*y*z)
     
     def vector_to_patch(self,vector):
-        z = 3 # there are allways three colors
+        z = 3 # there are always three colors
         n = vector.shape[0]
         x = int(np.sqrt(n // z))
-        y = x # let's suppose that given patch is allways square
+        y = x # let's suppose that a patch is always square
         return vector.reshape((x,y,z))
     
     def noise(self, image, proportion):
@@ -118,3 +121,53 @@ class ImageProcessing:
             horizontals.append(horizontal)
         
         return np.vstack(horizontals)
+
+    
+    def getNeighbors(self, i, j, im, N):
+        """
+        return all the neighbors surrounding
+        """
+        left = [im[i-1][j]]   if i != 0 else [[-1,-1,-1]]
+        right = [im[i+1][j]]  if i + 1 < N[0] else [[-1,-1,-1]]
+        top = [im[i][j-1]]    if j != 0 else [[-1,-1,-1]]
+        bottom = [im[i][j+1]] if j + 1 < N[0] else [[-1,-1,-1]]
+        return np.concatenate((left, right, bottom, top), axis=0)
+    
+    
+    def isNearTheEdge(self, pixel, neighbors):
+        """
+        return true if the pixel is near the edge
+        """
+        if np.sum(pixel) == 0:
+            return False
+        return np.count_nonzero(np.sum(neighbors, axis=1)) != np.array(neighbors).shape[0]
+
+    
+    def getEdges(self, im, N):
+        """ 
+        Return a list of indices around the edge
+        """
+        edgeList = [(-1,-1)]
+        for i in range(N[0]):
+            for j in range(N[1]):
+                if self.isNearTheEdge(im[i][j], self.getNeighbors(i, j, im, N)):
+                    edgeList.append((i,j))
+        return edgeList
+    
+    def priority(self, i, j):
+        """
+        Return a heuristic based on the patch of the region
+        """
+        confidenceTerm = self.confidence(i, j)
+        dataTerm = self.data(i, j)
+        return confidenceTerm * dataTerm
+    
+    def confidence(self, i, j):
+        pass
+    
+    def data(self, i, j, α = 255):
+        """
+        α is a normalization factor
+        """
+        α = 255 # 
+        pass
