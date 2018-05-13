@@ -4,7 +4,7 @@ from matplotlib.colors import hsv_to_rgb, rgb_to_hsv
 from sklearn.feature_extraction.image import extract_patches_2d
 
 class ImageProcessing:
-    
+  
     #  permet de lire une image et de la renvoyer sous forme d’un numpy.array
     def read_im(self,fn):
         image = np.array(plt.imread(fn))
@@ -16,9 +16,13 @@ class ImageProcessing:
     def read_im2(self,fn):
         return np.array(plt.imread(fn))
     
-    # Affichage de l’image (et des pixels manquants)
-    def show_im(self,fn):
-        plt.imshow(fn)
+    # Affichage de l’image (et des pixels manquants) 
+    def show_im(self,fn, title=None):
+        image = fn.copy()
+        image[image == -100] = 0 # pour visualiser les valeurs manquantes
+        plt.imshow(image)
+        if title != None:
+            plt.title(title)
         plt.show()
 
     def get_all_patches_by_pixel(self,h, im):
@@ -63,12 +67,12 @@ class ImageProcessing:
         noise_image = image.copy()
         for index in vector_indexes:
             i,j = np.unravel_index(index, (n,m))
-            noise_image[i,j,:] = 0 # let's put all in HSV to 0 to get black for sure
+            noise_image[i,j,:] = -100 # -100 ATTENTION! dans show_im ça c'est remplacé
         return noise_image
     
     def delete_rect(self,img,i,j,height,width):
         new_image = img.copy()
-        new_image[i:i+height, j:j+width,:] = 0
+        new_image[i:i+height, j:j+width,:] = -100
         return new_image
     
     def create_grid(self, min_x,max_x,min_y,max_y, step):
@@ -81,21 +85,13 @@ class ImageProcessing:
         xx, yy = np.meshgrid(xvalues, yvalues)
         return np.array([xx.flatten(), yy.flatten()]).T
     
-    def get_incomplete_patches_by_pixel(self, img, h):
-        contains_zero  = lambda patch: (patch[:,:] == 0).any() 
-        return np.array([patch for patch in self.get_all_patches_by_pixel(h, img) if contains_zero(patch)])
-    
-    def get_dictionnary_patches_by_pixel(self, img, h):
-        not_contain_zero = lambda patch: (patch[:,:] != 0).all() 
-        return np.array([patch for patch in self.get_all_patches_by_pixel(h, img) if not_contain_zero(patch)])
-    
     def get_all_patches(self, im, h, step):
         margin = h // 2
         N = im.shape[0]
         max_x = N - margin + 1 if N % 2 == 0 else N - margin
         max_y = N - margin + 1 if N % 2 == 0 else N - margin
         grid = self.create_grid(margin,max_x, margin,max_y, step)
-        return np.array([self.get_patch(pair[1], pair[0], h, im) for pair in grid])
+        return (grid, np.array([self.get_patch(pair[1], pair[0], h, im) for pair in grid]))
     
     def get_incomplete_patches(self, img, h, step):
         contains_zero  = lambda patch: (patch[:,:] == 0).any() 
@@ -105,23 +101,25 @@ class ImageProcessing:
         """
         Get all patche and convert to vectors.
         """
-        #not_contain_zero = lambda patch: (patch[:,:] != 0).all() filtrage plus tard
-        return np.array([self.patch_to_vector(patch) \
-                         for patch in self.get_all_patches(img,h, step)]).T #if not_contain_zero(patch)]).T
+        grid, patches = self.get_all_patches(img,h, step)
+        return grid,np.array([self.patch_to_vector(patch) for patch in patches]).T
     
-    def reconstruct_image(self,dictionary, h, step):
-        patches_n = dictionary.shape[1]
-        N = int(np.sqrt(patches_n))
-        horizontals = []
-        for i in range(N):
-            start = i * N
-            end = start + N
-            #dictionary[:, start:end]
-            horizontal = np.hstack([self.vector_to_patch(dictionary[:,i]) for i in range(start, end)])
-            horizontals.append(horizontal)
-        
-        return np.vstack(horizontals)
 
+    def complet_dictionary(self, dictionary):
+        """
+        return not-null patches in dictionary, eg what is the "real" dictionary according the annonce
+        """
+        return np.array([dictionary[:,i] for i in range(dictionary.shape[1]) if (dictionary[:,i] != -100).all()]).T
+    
+
+    def reconstruct_image_by_grid(self,dictionary, grid, h, N):
+        image = np.zeros((N,N,3))
+        margin = h // 2
+        for i,pair in enumerate(grid):
+            x,y = pair
+            image[y-margin:y+margin,x-margin:x+margin] = self.vector_to_patch(dictionary[:,i])
+        return image
+            
     
     def getNeighbors(self, i, j, im, N):
         """

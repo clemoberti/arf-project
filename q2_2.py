@@ -11,9 +11,6 @@ def estimate_patch(patch, dictionary, lamb):
     # rend le vecteur de poids sur le dictionnaire qui approxime au mieux le patch 
     # (restreint aux pixels exprimés) en utilisant l’algorithme du LASSO.
     # lamb la pénalisation du LASSO (controls the tradeoff between the reconstruction error and the sparsity)
-
-    #patch_vector = imp.patch_to_vector(patch)  # vecteur restreint aux pixels exprimés
-    normExpPixels = np.linalg.norm(patch)
     
     Y = patch.reshape(-1,1) # to make it column vector, where each line correspond one example
     indexes = filterExpressedPixels(Y)
@@ -22,9 +19,7 @@ def estimate_patch(patch, dictionary, lamb):
     Y_nonexp = Y[indexes].reshape(-1,1)
     X = dictionary[indexes, :]
     
-    model = Lasso(alpha=lamb)
+    model = Lasso(alpha=lamb, tol=0.001)
     model.fit(X, Y_nonexp) # coefficient sparse
-    beta = model.predict(dictionary) # puis on predire les pixels du patch
-    return beta
-    # je pense LASSO il fait tous ça, c'est pas le peine de faire par le main
-    #return np.argmin(np.square(np.linalg.norm(patch_vector - np.dot(dictionary, beta)), axis=(1,2)) + lamb * normExpPixels)
+    batch_prediction = model.predict(dictionary) # puis on predire les pixels du patch
+    return batch_prediction
