@@ -4,7 +4,7 @@ from sklearn.linear_model import Lasso
 
 def filterExpressedPixels(vec):
     # take only first array becouse we have only one dimension
-    return np.nonzero(vec)[0]
+    return np.where(vec != -100)[0]
 
 def estimate_patch(patch, dictionary, lamb):
     imp = ImageProcessing()
@@ -19,7 +19,7 @@ def estimate_patch(patch, dictionary, lamb):
     Y_nonexp = Y[indexes].reshape(-1,1)
     X = dictionary[indexes, :]
     
-    model = Lasso(alpha=lamb, tol=0.001)
-    model.fit(X, Y_nonexp) # coefficient sparse
-    batch_prediction = model.predict(dictionary) # puis on predire les pixels du patch
-    return batch_prediction
+    model = Lasso(alpha=lamb, normalize=True)
+    model = model.fit(X, Y_nonexp) # coefficient sparse
+    #return model.predict(dictionary) # puis on predire les pixels du patch
+    return np.array(model.coef_)

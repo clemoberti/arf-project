@@ -11,7 +11,32 @@ class ImageProcessing:
         if image.shape[2] != 3: # l'image dovait étre h x h x 3
             image = image[:,:,0:3]
         h = min(image.shape[0:2]) # make sure image is squared
-        return rgb_to_hsv(image[:h,:h,:])
+        return self.scale_values(rgb_to_hsv(image[:h,:h,:]))
+        #return image[:h,:h,:]
+        
+    def scale_values(self,image):
+        """
+        https://stackoverflow.com/questions/1735025/how-to-normalize-a-numpy-array-to-within-a-certain-range
+        
+        :image: an array with values in interval [0,1]
+        
+        :return --||-- in interval [-1,1]
+        """
+        vector = self.patch_to_vector(image)
+        vector -= 0.5 # depending of the values, this will change some of the values negatives
+        vector /= np.max(np.abs(vector),axis=0)
+        return self.vector_to_patch(vector)
+    
+    def rescale_values(self,image):
+        """        
+        :image: an array with values in interval [-1,1]
+        
+        :return --||-- in interval [0,1]
+        """
+        vector = self.patch_to_vector(image)
+        vector += 1 # this will change all of the values to positives
+        vector /= vector.max()
+        return self.vector_to_patch(vector)
 
     def read_im2(self,fn):
         return np.array(plt.imread(fn))
@@ -20,7 +45,8 @@ class ImageProcessing:
     def show_im(self,fn, title=None):
         image = fn.copy()
         image[image == -100] = 0 # pour visualiser les valeurs manquantes
-        plt.imshow(image)
+        rescaled_im = self.rescale_values(image)
+        plt.imshow(hsv_to_rgb(rescaled_im))
         if title != None:
             plt.title(title)
         plt.show()
@@ -45,14 +71,14 @@ class ImageProcessing:
     # window to vector
     def patch_to_vector(self,patch):
         x,y,z = patch.shape
-        return patch.reshape(x*y*z)
+        return patch.copy().reshape(x*y*z)
     
     def vector_to_patch(self,vector):
         z = 3 # there are always three colors
         n = vector.shape[0]
         x = int(np.sqrt(n // z))
         y = x # let's suppose that a patch is always square
-        return vector.reshape((x,y,z))
+        return vector.copy().reshape((x,y,z))
     
     def noise(self, image, proportion):
         """
@@ -99,7 +125,7 @@ class ImageProcessing:
     
     def get_dictionary_patches(self, img, h, step):
         """
-        Get all patche and convert to vectors.
+        Get all patches and convert to vectors and scale values.
         """
         grid, patches = self.get_all_patches(img,h, step)
         return grid,np.array([self.patch_to_vector(patch) for patch in patches]).T
@@ -107,9 +133,9 @@ class ImageProcessing:
 
     def complet_dictionary(self, dictionary):
         """
-        return not-null patches in dictionary, eg what is the "real" dictionary according the annonce
+        return not-null indexes of patches in dictionary, eg what is the "real" dictionary according the annonce
         """
-        return np.array([dictionary[:,i] for i in range(dictionary.shape[1]) if (dictionary[:,i] != -100).all()]).T
+        return np.array([i for i in range(dictionary.shape[1]) if (dictionary[:,i] != -100).all()]).T
     
 
     def reconstruct_image_by_grid(self,dictionary, grid, h, N):

@@ -1,7 +1,7 @@
 
 from ImageProcessing import ImageProcessing
 import numpy as np
-from q2_2 import estimate_patch
+from sklearn.linear_model import Lasso
 
 class IterativeInpainting:
     
@@ -17,7 +17,9 @@ class IterativeInpainting:
         
     def inpaint(self, max_iter=1, alpha=1):
         columns = self.dictionary.shape[1]
-        print("columns : ", columns)
+        clean_dico_indexes = self.imp.complet_dictionary(self.dictionary)
+        print("start painting")
+        print("columns: ", str(columns))
         # politique le plus simple pour remplir le image : dans l'ordre
         for ite in range(max_iter):
             print(ite)
@@ -27,27 +29,42 @@ class IterativeInpainting:
                 if not self.contains_missing_values(patch):
                     continue
                 
-                # TODO dont calcul this every time, instead update in every iteration
-                clean_dico = self.imp.complet_dictionary(self.dictionary)
-                new_patch = estimate_patch(patch, clean_dico, alpha)
+                dictionary = self.dictionary[:, clean_dico_indexes]
+                
+                ### calcule poids : 
+               
+                non_null_indexes = np.where(patch != -100)[0]
+
+                # for learning, use only nonzero examples
+                Y = patch[non_null_indexes].reshape(-1,1)
+                X = dictionary[non_null_indexes, :]
+
+                model = Lasso(alpha=alpha)
+                model = model.fit(X, Y) # coefficient sparse
+                coef = np.array(model.coef_)
+                
+                #prediction
+                new_patch = dictionary.dot(coef)
+                
+                ############################
+                
+                print("non null coefs: ")
+                print((coef != 0).sum() / len(coef))
                 
 
-                #this shouldn't happen but dont know why
-                if np.count_nonzero(new_patch > 1) > 0: # theres some too big values
-                    max_values = np.ones(len(new_patch))
-                    new_patch = np.min([new_patch, max_values],axis=0)
-                if np.count_nonzero(new_patch < 0) > 0: # theres some too small values
-                    min_values = np.zeros(len(new_patch))
-                    new_patch = np.max([new_patch, min_values],axis=0)
-
-                
+                print("fix") 
                 # update missing pixels
                 pixels_to_update = patch == -100
                 patch[pixels_to_update] = new_patch[pixels_to_update]
                 self.dictionary[:,i] = patch
+                
+                clean_dico_indexes = np.append(clean_dico_indexes,i) # this patch is handled, take it to account in next iteration
             
         return self.dictionary
     
+    def get_image(self):
+        return self.imp.reconstruct_image_by_grid(self.dictionary,self.grid,self.patch_sizes,self.N)
+    
     def show_image(self, title=None):
-        self.image = self.imp.reconstruct_image_by_grid(self.dictionary,self.grid,self.patch_sizes,self.N)
-        self.imp.show_im(self.image, title=title)
+        image = self.imp.reconstruct_image_by_grid(self.dictionary,self.grid,self.patch_sizes,self.N)
+        self.imp.show_im(image, title=title)
