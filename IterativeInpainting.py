@@ -90,7 +90,7 @@ class IterativeInpainting:
              # we init x to the left of the patch
             x = i - self.h if i - self.h > 0 else 0  # init
             while (x <= x_max):
-                conf = conf + m_confid(y * self.im_width + X)
+                conf = conf + self.m_confid(y * self.im_width + x) # depends on how the matrix is represented matrix or vector
                 x += 1
             y += 1
 
