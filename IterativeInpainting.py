@@ -11,6 +11,8 @@ class IterativeInpainting:
         self.patch_sizes = patch_sizes
         self.step_size = step_size
         self.grid, self.dictionary = self.imp.get_dictionary_patches(image, patch_sizes, step_size)
+        # Used for trying something out
+        self.im = image
         # Used to compute confidence
         self.im_width = image.shape[0]
         self.im_height = image.shape[1]
@@ -18,63 +20,76 @@ class IterativeInpainting:
         self.m_confid = None # Matrix of confidence init with 0 for missing pixels and 1s otherwise
 
     def contains_missing_values(self,patch):
-        return (patch == -100).any()
+        return (patch == 0).any()
 
-    def inpaint(self, max_iter=1, alpha=1):
+    def inpaint(self, alpha=1):
         columns = self.dictionary.shape[1]
         clean_dico_indexes = self.imp.complet_dictionary(self.dictionary)
         print("start painting")
         print("columns: ", str(columns))
         # politique le plus simple pour remplir le image : dans l'ordre
-        for ite in range(max_iter):
-            print(ite)
-            for i in range(columns):
-                patch = self.dictionary[:, i]
-
-                if not self.contains_missing_values(patch):
-                    continue
-
-                dictionary = self.dictionary[:, clean_dico_indexes]
-
-                ### calcule poids :
-
-                non_null_indexes = np.where(patch != -100)[0]
-
-                # for learning, use only nonzero examples
-                Y = patch[non_null_indexes].reshape(-1,1)
-                X = dictionary[non_null_indexes, :]
-
-                model = Lasso(alpha=alpha)
-                model = model.fit(X, Y) # coefficient sparse
-                coef = np.array(model.coef_)
-
-                #prediction
-                new_patch = dictionary.dot(coef)
-
-                ############################
-
-                print("non null coefs: ")
-                print((coef != 0).sum() / len(coef))
-
-
-                print("fix")
-                # update missing pixels
-                pixels_to_update = patch == -100
-                patch[pixels_to_update] = new_patch[pixels_to_update]
-                self.dictionary[:,i] = patch
-
-                clean_dico_indexes = np.append(clean_dico_indexes,i) # this patch is handled, take it to account in next iteration
-
-        return self.dictionary
+        
+        while self.some_pixels_are_missing():
+            patch = self.get_next_patch()
+            
+            clean_dico = self.imp.complet_dictionary(self.dictionary) 
+            dictionary = self.dictionary[:, clean_dico_indexes] 
+            
+            ### calcule poids :
+            
+            non_null_indexes = np.where(patch != -100)[0]
+            
+            # for learning, use only nonzero examples
+            Y = patch[non_null_indexes].reshape(-1,1)
+            X = dictionary[non_null_indexes, :]
+            
+            model = Lasso(alpha=alpha)
+            model = model.fit(X, Y) # coefficient sparse
+            coef = np.array(model.coef_)
+            print(coef.size)
+            print(dictionary.shape)
+            #prediction
+            new_patch = dictionary.dot(coef)
+            
+            return new_patch, patch
+            ############################
+                
+            print("non null coefs: %i" % ((coef != 0).sum() / len(coef)))
+#           import pdb; pdb.set_trace()
+            print("fix")
+            
+            # update missing pixels
+            pixels_to_update = patch == 0
+            patch[pixels_to_update] = new_patch[pixels_to_update]
+            self.dictionary[:,i] = patch
+                    
+        return self.im, self.im.copy()
 
     def get_image(self):
         return self.imp.reconstruct_image_by_grid(self.dictionary,self.grid,self.patch_sizes,self.N)
 
+    def get_dict(self):
+        return self.dictionary
+    
     def show_image(self, title=None):
         image = self.imp.reconstruct_image_by_grid(self.dictionary,self.grid,self.patch_sizes,self.N)
         self.imp.show_im(image, title=title)
 
-    def computeConfidence(i, j):
+    def some_pixels_are_missing(self):
+        """
+        return true if any pixel is still missing from the image
+        """
+        contains_zero = lambda patch: (patch == -100).any()
+        for patch in self.im:
+            if (contains_zero(patch)):
+                return True
+        return False
+    
+    def get_next_patch(self):
+        edges = self.imp.get_edges(self.im, self.im.shape)
+        return self.imp.get_patch(edges[0][0], edges[0][1], self.patch_sizes, self.im)
+    
+    def computeConfidence(self, i, j):
         """
         Calculate the confidence of a given pixel(i, j), usually on the edge
         """
