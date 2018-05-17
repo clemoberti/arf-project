@@ -11,42 +11,13 @@ class ImageProcessing:
         if image.shape[2] != 3: # l'image dovait étre h x h x 3
             image = image[:,:,0:3]
         h = min(image.shape[0:2]) # make sure image is squared
-        return self.scale_values(rgb_to_hsv(image[:h,:h,:]))
-        #return image[:h,:h,:]
-        
-    def scale_values(self,image):
-        """
-        https://stackoverflow.com/questions/1735025/how-to-normalize-a-numpy-array-to-within-a-certain-range
-        
-        :image: an array with values in interval [0,1]
-        
-        :return --||-- in interval [-1,1]
-        """
-        vector = self.patch_to_vector(image)
-        vector -= 0.5 # depending of the values, this will change some of the values negatives
-        vector /= np.max(np.abs(vector),axis=0)
-        return self.vector_to_patch(vector)
-    
-    def rescale_values(self,image):
-        """        
-        :image: an array with values in interval [-1,1]
-        
-        :return --||-- in interval [0,1]
-        """
-        vector = self.patch_to_vector(image)
-        vector += 1 # this will change all of the values to positives
-        vector /= vector.max()
-        return self.vector_to_patch(vector)
+        return rgb_to_hsv(image[:h,:h,:])
 
-    def read_im2(self,fn):
-        return np.array(plt.imread(fn))
     
     # Affichage de l’image (et des pixels manquants) 
     def show_im(self,fn, title=None):
         image = fn.copy()
-        image[image == -100] = 0 # pour visualiser les valeurs manquantes
-        rescaled_im = self.rescale_values(image)
-        plt.imshow(hsv_to_rgb(rescaled_im))
+        plt.imshow(hsv_to_rgb(np.abs(image)))
         if title != None:
             plt.title(title)
         plt.show()
@@ -93,12 +64,12 @@ class ImageProcessing:
         noise_image = image.copy()
         for index in vector_indexes:
             i,j = np.unravel_index(index, (n,m))
-            noise_image[i,j,:] = -100 # -100 ATTENTION! dans show_im ça c'est remplacé
+            noise_image[i,j,:] = 0
         return noise_image
     
     def delete_rect(self,img,i,j,height,width):
         new_image = img.copy()
-        new_image[i:i+height, j:j+width,:] = -100
+        new_image[i:i+height, j:j+width,:] = 0
         return new_image
     
     def create_grid(self, min_x,max_x,min_y,max_y, step):
@@ -135,7 +106,7 @@ class ImageProcessing:
         """
         return not-null indexes of patches in dictionary, eg what is the "real" dictionary according the annonce
         """
-        return np.array([i for i in range(dictionary.shape[1]) if (dictionary[:,i] != -100).all()]).T
+        return np.array([i for i in range(dictionary.shape[1]) if (dictionary[:,i] != 0).all()]).T
     
 
     def reconstruct_image_by_grid(self,dictionary, grid, h, N):
