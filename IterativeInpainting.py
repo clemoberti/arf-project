@@ -10,9 +10,8 @@ class IterativeInpainting:
         self.N = image.shape[0]
         self.patch_sizes = patch_sizes
         self.step_size = step_size
-        self.grid, self.dictionary = self.imp.get_dictionary_patches(image, patch_sizes, step_size)
         # Used for trying something out
-        self.im = image
+        self.im = image.copy()
         # Used to compute confidence
         self.im_width = image.shape[0]
         self.im_height = image.shape[1]
@@ -23,54 +22,48 @@ class IterativeInpainting:
         return (patch == 0).any()
 
     def inpaint(self, alpha=1):
-        columns = self.dictionary.shape[1]
-        clean_dico_indexes = self.imp.complet_dictionary(self.dictionary)
+        # clean_dico_indexes = self.imp.complet_dictionary(self.dictionary)
         print("start painting")
-        print("columns: ", str(columns))
         # politique le plus simple pour remplir le image : dans l'ordre
-        
+
         while self.some_pixels_are_missing():
-            patch = self.get_next_patch()
-            
-            clean_dico = self.imp.complet_dictionary(self.dictionary) 
-            dictionary = self.dictionary[:, clean_dico_indexes] 
-            
+            patch_original, i, j = self.get_next_patch()
+            patch = self.imp.patch_to_vector(patch_original)
+            dictionary = self.imp.get_dictionary_patches(self.im, self.patch_sizes, self.step_size)
             ### calcule poids :
-            
+
             non_null_indexes = np.where(patch != -100)[0]
-            
             # for learning, use only nonzero examples
             Y = patch[non_null_indexes].reshape(-1,1)
             X = dictionary[non_null_indexes, :]
-            
+
             model = Lasso(alpha=alpha)
             model = model.fit(X, Y) # coefficient sparse
             coef = np.array(model.coef_)
-            print(coef.size)
-            print(dictionary.shape)
             #prediction
-            new_patch = dictionary.dot(coef)
-            
-            return new_patch, patch
+
+            new_patch = np.sum([coef[i] * dictionary[:,i] for i in range(len(coef))], axis=0)
+
             ############################
-                
-            print("non null coefs: %i" % ((coef != 0).sum() / len(coef)))
-#           import pdb; pdb.set_trace()
-            print("fix")
-            
-            # update missing pixels
-            pixels_to_update = patch == 0
+
+            pixels_to_update = patch == -100
             patch[pixels_to_update] = new_patch[pixels_to_update]
-            self.dictionary[:,i] = patch
-                    
-        return self.im, self.im.copy()
+            new_patch = self.imp.vector_to_patch(new_patch)
+
+            # import pdb; pdb.set_trace()
+            # pixels_to_update_patch = patch_original
+
+            for i2 in range(self.patch_sizes):
+                for j2 in range(self.patch_sizes):
+                    if (patch_original[i2,j2] == -100).all():
+                        self.im[i+i2,j+j2] = new_patch[i2,j2]
+            # update missing pixels
+
+        return self.im
 
     def get_image(self):
         return self.imp.reconstruct_image_by_grid(self.dictionary,self.grid,self.patch_sizes,self.N)
 
-    def get_dict(self):
-        return self.dictionary
-    
     def show_image(self, title=None):
         image = self.imp.reconstruct_image_by_grid(self.dictionary,self.grid,self.patch_sizes,self.N)
         self.imp.show_im(image, title=title)
@@ -84,11 +77,13 @@ class IterativeInpainting:
             if (contains_zero(patch)):
                 return True
         return False
-    
+
     def get_next_patch(self):
         edges = self.imp.get_edges(self.im, self.im.shape)
-        return self.imp.get_patch(edges[0][0], edges[0][1], self.patch_sizes, self.im)
-    
+        i = edges[0][0] - self.patch_sizes // 2
+        j = edges[0][1] - self.patch_sizes // 2
+        return self.imp.get_patch(edges[0][0], edges[0][1], self.patch_sizes, self.im), i, j
+
     def computeConfidence(self, i, j):
         """
         Calculate the confidence of a given pixel(i, j), usually on the edge

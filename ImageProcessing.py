@@ -7,7 +7,6 @@ class ImageProcessing:
     def __init__(self): #, patch_width, patch_height):
         # We can extend to non squared patchs later on
         self.missing_pixel_value = -100
-        pass
 
     def read_im(self,fn):
         """
@@ -91,7 +90,7 @@ class ImageProcessing:
         max_x = N - margin + 1 if N % 2 == 0 else N - margin
         max_y = N - margin + 1 if N % 2 == 0 else N - margin
         grid = self.create_grid(margin,max_x, margin,max_y, step)
-        return (grid, np.array([self.get_patch(pair[1], pair[0], h, im) for pair in grid]))
+        return np.array([self.get_patch(pair[1], pair[0], h, im) for pair in grid])
 
     def get_incomplete_patches(self, img, h, step):
         contains_zero  = lambda patch: (patch[:,:] == self.missing_pixel_value).any()
@@ -101,8 +100,9 @@ class ImageProcessing:
         """
         Get all patches and convert to vectors and scale values.
         """
-        grid, patches = self.get_all_patches(img,h, step)
-        return grid, np.array([self.patch_to_vector(patch) for patch in patches]).T
+        patches = self.get_all_patches(img,h, step)
+        contains_not_zero  = lambda patch: (patch[:,:] != self.missing_pixel_value).all()
+        return np.array([self.patch_to_vector(patch) for patch in patches if contains_not_zero(patch)]).T
 
 
     def complet_dictionary(self, dictionary):
