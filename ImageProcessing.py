@@ -32,11 +32,13 @@ class ImageProcessing:
     def get_patch(self, i, j, h, image):
         """
         retourne le patch centré en (i, j) et de longueur h d’une image im
+        si le centre se trouve au bord on retourne le patch le plus proche
         """
-        window_start_i = i - h // 2 # left upper corner of the window
-        window_start_j = j - h // 2
-        window_end_i = i + h // 2# right lower corner of the window
-        window_end_j = j + h // 2
+        N = image.shape[0]
+        window_start_i = i - h # left upper corner of the window
+        window_start_j = j - h
+        window_end_i = i + h # right lower corner of the window
+        window_end_j = j + h
 
         if len(image.shape) == 2: # only for testing with number matrix
             return image[window_start_i:window_end_i, window_start_j:window_end_j]
@@ -44,7 +46,8 @@ class ImageProcessing:
         return image[window_start_i:window_end_i, window_start_j:window_end_j,:]
 
     def patch_to_vector(self,patch):
-        return patch.copy().reshape(-1)
+        x,y,z = patch.shape
+        return patch.copy().reshape(x*y*z)
 
     def vector_to_patch(self, vector):
         z = 3 # there are always three colors
@@ -53,7 +56,7 @@ class ImageProcessing:
         y = x # let's suppose that a patch is always square
         return vector.copy().reshape((x,y,z))
 
-    def noise(self, image, proportion):
+    def noise(self, image, proportion, h):
         """
         proportion: quantite des pixels qu'on va mettre à noir, par exemple 0.4
         """
@@ -66,6 +69,8 @@ class ImageProcessing:
         noise_image = image.copy()
         for index in vector_indexes:
             i,j = np.unravel_index(index, (n,m))
+            if (i < h or i + h > n or j < h or j + h > m):
+                continue
             noise_image[i,j,:] = self.missing_pixel_value
         return noise_image
 
@@ -85,11 +90,10 @@ class ImageProcessing:
         return np.array([xx.flatten(), yy.flatten()]).T
 
     def get_all_patches(self, im, h, step):
-        margin = h // 2
         N = im.shape[0]
-        max_x = N - margin + 1 if N % 2 == 0 else N - margin
-        max_y = N - margin + 1 if N % 2 == 0 else N - margin
-        grid = self.create_grid(margin,max_x, margin,max_y, step)
+        max_x = N - h
+        max_y = N - h
+        grid = self.create_grid(h, max_x, h,max_y, step)
         return np.array([self.get_patch(pair[1], pair[0], h, im) for pair in grid])
 
     def get_incomplete_patches(self, img, h, step):
@@ -111,15 +115,6 @@ class ImageProcessing:
         """
         # return np.array([dictionary]).T
         return np.array([i for i in range(dictionary.shape[1]) if (dictionary[:,i] != self.missing_pixel_value).all()]).T
-
-
-    def reconstruct_image_by_grid(self,dictionary, grid, h, N):
-        image = np.zeros((N,N,3))
-        margin = h // 2
-        for i,pair in enumerate(grid):
-            x,y = pair
-            image[y-margin:y+margin,x-margin:x+margin] = self.vector_to_patch(dictionary[:,i])
-        return image
 
     def get_neighbors(self, i, j, im, N):
         """
@@ -145,7 +140,6 @@ class ImageProcessing:
         Return a list of indices around the edge
         """
         edgeList = []
-        print(n)
         for i in range(n[0]):
             for j in range(n[1]):
                 if self.is_near_the_edge(im[i][j], self.get_neighbors(i, j, im, n)):

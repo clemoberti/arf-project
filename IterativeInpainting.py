@@ -5,18 +5,20 @@ from sklearn.linear_model import Lasso
 
 class IterativeInpainting:
 
-    def __init__(self, image, patch_sizes=32, step_size=32):
+    def __init__(self, image, h=32, step_size=32):
         self.imp = ImageProcessing() # this one shouldn't maybe be class but 'static' file :D
         self.N = image.shape[0]
-        self.patch_sizes = patch_sizes
         self.step_size = step_size
+
         # Used for trying something out
         self.im = image.copy()
         # Used to compute confidence
         self.im_width = image.shape[0]
         self.im_height = image.shape[1]
-        self.h = patch_sizes // 2
-        self.m_confid = None # Matrix of confidence init with 0 for missing pixels and 1s otherwise
+        self.h = h
+        image_vector = self.imp.patch_to_vector(image)
+        self.m_confid = np.zeros(image_vector.shape) # Matrix of confidence init with 0 for missing pixels and 1s otherwise
+        self.m_confid[image_vector != -100] = 1
 
     def contains_missing_values(self,patch):
         return (patch == 0).any()
@@ -28,12 +30,13 @@ class IterativeInpainting:
 
         while self.some_pixels_are_missing():
             patch_original, i, j = self.get_next_patch()
+            # return patch_original
             patch = self.imp.patch_to_vector(patch_original)
-            dictionary = self.imp.get_dictionary_patches(self.im, self.patch_sizes, self.step_size)
-            ### calcule poids :
+            dictionary = self.imp.get_dictionary_patches(self.im, self.h, self.step_size)
 
-            non_null_indexes = np.where(patch != -100)[0]
             # for learning, use only nonzero examples
+            non_null_indexes = np.where(patch != -100)[0]
+            #import pdb; pdb.set_trace()
             Y = patch[non_null_indexes].reshape(-1,1)
             X = dictionary[non_null_indexes, :]
 
@@ -41,32 +44,18 @@ class IterativeInpainting:
             model = model.fit(X, Y) # coefficient sparse
             coef = np.array(model.coef_)
             #prediction
-
             new_patch = np.sum([coef[i] * dictionary[:,i] for i in range(len(coef))], axis=0)
-
-            ############################
 
             pixels_to_update = patch == -100
             patch[pixels_to_update] = new_patch[pixels_to_update]
             new_patch = self.imp.vector_to_patch(new_patch)
 
             # import pdb; pdb.set_trace()
-            # pixels_to_update_patch = patch_original
-
-            for i2 in range(self.patch_sizes):
-                for j2 in range(self.patch_sizes):
+            for i2 in range(self.h*2):
+                for j2 in range(self.h*2):
                     if (patch_original[i2,j2] == -100).all():
                         self.im[i+i2,j+j2] = new_patch[i2,j2]
-            # update missing pixels
-
         return self.im
-
-    def get_image(self):
-        return self.imp.reconstruct_image_by_grid(self.dictionary,self.grid,self.patch_sizes,self.N)
-
-    def show_image(self, title=None):
-        image = self.imp.reconstruct_image_by_grid(self.dictionary,self.grid,self.patch_sizes,self.N)
-        self.imp.show_im(image, title=title)
 
     def some_pixels_are_missing(self):
         """
@@ -80,9 +69,9 @@ class IterativeInpainting:
 
     def get_next_patch(self):
         edges = self.imp.get_edges(self.im, self.im.shape)
-        i = edges[0][0] - self.patch_sizes // 2
-        j = edges[0][1] - self.patch_sizes // 2
-        return self.imp.get_patch(edges[0][0], edges[0][1], self.patch_sizes, self.im), i, j
+        i = edges[0][0] - self.h
+        j = edges[0][1] - self.h
+        return self.imp.get_patch(edges[0][0], edges[0][1], self.h, self.im), i, j
 
     def computeConfidence(self, i, j):
         """
