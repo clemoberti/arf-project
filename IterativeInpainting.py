@@ -24,9 +24,6 @@ class IterativeInpainting:
         return (patch == 0).any()
 
     def inpaint(self, alpha=1):
-        # clean_dico_indexes = self.imp.complet_dictionary(self.dictionary)
-        print("start painting")
-        # politique le plus simple pour remplir le image : dans l'ordre
 
         while self.some_pixels_are_missing():
             patch_original, i, j = self.get_next_patch()
