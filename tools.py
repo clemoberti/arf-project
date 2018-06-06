@@ -18,6 +18,26 @@ def show_sample_usps(data):
         img = np.random.randint(10, size=(h,w))
         fig.add_subplot(rows, columns, i)
         show_usps(data[i])
+        
+def show_inpainting_images(image_processing, orig, result, columns, rows):
+    w=20
+    h=20
+    fig=plt.figure(figsize=(w, h))
+    results_n = columns - 1
+    N = len(orig) + len(result[0]) * results_n
+    ind = list(range(1, N + 1, columns))
+    for i in range(len(orig)):
+        fig.add_subplot(rows, columns, ind[i])
+        image_processing.show_im(orig[i], title="Avec bruit",show=False)
+    
+    for j in range(results_n):
+        ind = list(range(2 + j, N + 1, columns))
+        for i in range(len(result[j])):
+            fig.add_subplot(rows, columns, ind[i])
+            h, step, img = result[j][i]
+            title = "Resultat, h = " + str(h) + ", step = " + str(step)
+            image_processing.show_im(img, title=title,show=False)
+    plt.show()
 
 def show_usps(data):
     plt.imshow(data.reshape((16,16)),interpolation="nearest",cmap="gray")

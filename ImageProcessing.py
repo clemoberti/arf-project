@@ -18,7 +18,7 @@ class ImageProcessing:
         h = min(image.shape[0:2]) # make sure image is squared
         return np.abs(rgb_to_hsv(image[:h,:h,:]))
 
-    def show_im(self, fn, title=None):
+    def show_im(self, fn, title=None, show=True):
         """
         Affichage de l’image (et des pixels manquants)
         """
@@ -27,7 +27,8 @@ class ImageProcessing:
         plt.imshow(hsv_to_rgb(np.abs(image)))
         if title != None:
             plt.title(title)
-        plt.show()
+        if show:
+            plt.show()
 
     def get_patch(self, i, j, h, image):
         """
