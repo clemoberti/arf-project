@@ -16,7 +16,7 @@ class ImageProcessing:
         if image.shape[2] != 3: # l'image dovait étre h x h x 3
             image = image[:,:,0:3]
         h = min(image.shape[0:2]) # make sure image is squared
-        return rgb_to_hsv(image[:h,:h,:])
+        return np.abs(rgb_to_hsv(image[:h,:h,:]))
 
     def show_im(self, fn, title=None):
         """
@@ -90,11 +90,12 @@ class ImageProcessing:
         return np.array([xx.flatten(), yy.flatten()]).T
 
     def get_all_patches(self, im, h, step):
+        image = im.copy()
         N = im.shape[0]
         max_x = N - h
         max_y = N - h
         grid = self.create_grid(h, max_x, h,max_y, step)
-        return np.array([self.get_patch(pair[1], pair[0], h, im) for pair in grid])
+        return np.array([self.get_patch(pair[1], pair[0], h, image) for pair in grid])
 
     def get_incomplete_patches(self, img, h, step):
         contains_zero  = lambda patch: (patch[:,:] == self.missing_pixel_value).any()

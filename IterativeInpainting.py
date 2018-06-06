@@ -1,4 +1,3 @@
-
 from ImageProcessing import ImageProcessing
 import numpy as np
 from sklearn.linear_model import Lasso
@@ -17,8 +16,10 @@ class IterativeInpainting:
         self.im_height = image.shape[1]
         self.h = h
         image_vector = self.imp.patch_to_vector(image)
-        self.m_confid = np.zeros(image_vector.shape) # Matrix of confidence init with 0 for missing pixels and 1s otherwise
-        self.m_confid[image_vector != -100] = 1
+
+        # Matrix of confidence init with 0 for missing pixels and 1s otherwise
+        self.m_conf = np.zeros(image_vector.shape)
+        self.m_conf[image_vector != -100] = 1
 
     def contains_missing_values(self,patch):
         return (patch == 0).any()
@@ -27,24 +28,26 @@ class IterativeInpainting:
         # clean_dico_indexes = self.imp.complet_dictionary(self.dictionary)
         print("start painting")
         # politique le plus simple pour remplir le image : dans l'ordre
+        dictionary = self.imp.get_dictionary_patches(self.im, self.h, self.step_size)
 
         while self.some_pixels_are_missing():
-            patch_original, i, j = self.get_next_patch()
-            # return patch_original
+            patch_original, i1, j1 = self.get_next_patch()
             patch = self.imp.patch_to_vector(patch_original)
             dictionary = self.imp.get_dictionary_patches(self.im, self.h, self.step_size)
 
             # for learning, use only nonzero examples
             non_null_indexes = np.where(patch != -100)[0]
-            #import pdb; pdb.set_trace()
             Y = patch[non_null_indexes].reshape(-1,1)
             X = dictionary[non_null_indexes, :]
 
-            model = Lasso(alpha=alpha)
+            model = Lasso(alpha=alpha, max_iter=1000000)
             model = model.fit(X, Y) # coefficient sparse
             coef = np.array(model.coef_)
-            #prediction
-            new_patch = np.sum([coef[i] * dictionary[:,i] for i in range(len(coef))], axis=0)
+
+            # prediction
+            # import pdb; pdb.set_trace()
+            sum_coef = np.sum(coef[coef != 0])
+            new_patch = np.divide(np.sum([coef[i] * dictionary[:,i] for i in range(len(coef))], axis=0), sum_coef)
 
             pixels_to_update = patch == -100
             patch[pixels_to_update] = new_patch[pixels_to_update]
@@ -54,7 +57,9 @@ class IterativeInpainting:
             for i2 in range(self.h*2):
                 for j2 in range(self.h*2):
                     if (patch_original[i2,j2] == -100).all():
-                        self.im[i+i2,j+j2] = new_patch[i2,j2]
+                        self.im[i1+i2,j1+j2] = new_patch[i2,j2]
+                        self.m_conf[i2 * self.im_width + j2] = 0.5
+
         return self.im
 
     def some_pixels_are_missing(self):
@@ -69,15 +74,23 @@ class IterativeInpainting:
 
     def get_next_patch(self):
         edges = self.imp.get_edges(self.im, self.im.shape)
-        i = edges[0][0] - self.h
-        j = edges[0][1] - self.h
-        return self.imp.get_patch(edges[0][0], edges[0][1], self.h, self.im), i, j
+
+        max_coord = edges[0]
+        max_conf = 0
+        for current_point in edges:
+            conf = self.computeConfidence(current_point[0], current_point[1])
+            if conf > max_conf:
+                max_conf = conf
+                max_point = current_point
+        i1 = max(max_coord[0] - self.h, 0)
+        j1 = max(max_coord[1] - self.h, 0)
+        return self.imp.get_patch(max_point[0], max_point[1], self.h, self.im), i1, j1
 
     def computeConfidence(self, i, j):
         """
         Calculate the confidence of a given pixel(i, j), usually on the edge
         """
-        confidence = 0
+        conf = 0
 
         # y_max represents the bottom side of the patch
         y_max = j + self.h if j + self.h < self.im_height - 1 else self.im_height - 1
@@ -89,8 +102,8 @@ class IterativeInpainting:
              # we init x to the left of the patch
             x = i - self.h if i - self.h > 0 else 0  # init
             while (x <= x_max):
-                conf = conf + self.m_confid(y * self.im_width + x) # depends on how the matrix is represented matrix or vector
+                conf = conf + self.m_conf[y * self.im_width + x] # depends on how the matrix is represented matrix or vector
                 x += 1
             y += 1
 
-        return confidence / ((self.h * 2 + 1) * (self.h * 2 + 1))
+        return conf / ((self.h * 2 + 1) * (self.h * 2 + 1))
